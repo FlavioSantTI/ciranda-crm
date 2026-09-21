@@ -98,9 +98,9 @@ WACONECTOR_BACKEND=evolution
 WACONECTOR_INSTANCE=$EVOAPI_INST
 
 # ─── Build local (nao puxar do registry) ────
-APP_IMAGE=deskcomm-app:local
-WORKER_IMAGE=deskcomm-worker:local
-SCHEDULER_IMAGE=deskcomm-scheduler:local
+APP_IMAGE=ciranda-app:local
+WORKER_IMAGE=ciranda-worker:local
+SCHEDULER_IMAGE=ciranda-scheduler:local
 APP_PULL_POLICY=never
 WORKER_PULL_POLICY=never
 SCHEDULER_PULL_POLICY=never
