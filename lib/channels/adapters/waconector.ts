@@ -116,7 +116,8 @@ async function getWaconectorConnector(): Promise<WaConnector | null> {
 
     if (backend === "evolution") {
       const evolutionMod = await import("waconector/evolution");
-      const adapter = evolutionMod.evolution({ baseUrl, apiKey });
+      const instance = process.env.WACONECTOR_INSTANCE || undefined;
+      const adapter = evolutionMod.evolution({ baseUrl, apiKey, instance });
       connector = waconector.createConnector(adapter) as unknown as WaConnector;
     } else {
       // Backend não implementado ainda — loga e devolve null (noop).

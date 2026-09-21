@@ -158,6 +158,8 @@ const schema = z.object({
   WACONECTOR_BASE_URL: z.string().optional().default(""),
   WACONECTOR_API_KEY: z.string().optional().default(""),
   WACONECTOR_BACKEND: z.string().optional().default("evolution"),
+  /** Nome da instância no provider (EvoAPI v2 exige no path). Vazio = v1 (resolve pelo apikey). */
+  WACONECTOR_INSTANCE: z.string().optional().default(""),
 
   // Upstash Redis
   UPSTASH_REDIS_REST_URL: required("UPSTASH_REDIS_REST_URL"),
