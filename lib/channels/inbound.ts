@@ -18,7 +18,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { CHANNEL_PROVIDER_ZERNIO } from "./capabilities";
+import { CHANNEL_PROVIDER_WACONECTOR, CHANNEL_PROVIDER_ZERNIO } from "./capabilities";
 import { sincronizarSaudeDaConexao } from "./health";
 import {
   atualizarEspelhoDoTemplate,
@@ -70,7 +70,7 @@ export type InboundWebhookOutcome =
  * trabalho — e respondido sem nomear provider do lado de fora.
  */
 export function acceptsInboundWebhook(provider: string): boolean {
-  return provider === CHANNEL_PROVIDER_ZERNIO;
+  return provider === CHANNEL_PROVIDER_ZERNIO || provider === CHANNEL_PROVIDER_WACONECTOR;
 }
 
 export async function handleInboundWebhook(
@@ -82,6 +82,8 @@ export async function handleInboundWebhook(
   switch (provider) {
     case CHANNEL_PROVIDER_ZERNIO:
       return zernioInbound(admin, input);
+    case CHANNEL_PROVIDER_WACONECTOR:
+      return waconectorInbound(admin, input);
     default:
       // Token de um canal que não entra por aqui. É configuração trocada, não
       // ataque — mas processar seria ler o payload com o parser errado.
@@ -194,4 +196,67 @@ async function zernioInbound(
     payload,
   });
   return { ok: true, body: { ...r } };
+}
+
+/**
+ * Inbound do waconector — parseia o webhook do EvoAPI (ou outro backend) usando
+ * a biblioteca waconector, que devolve `CanonicalEvent[]`.
+ *
+ * ─── Estado atual ──────────────────────────────────────────────────────────
+ *
+ * HOJE: parseia e classifica os eventos, mas NÃO faz ingest completo no banco
+ * (criar contato/conversa/mensagem com dedup e idempotência). O pipeline de
+ * ingest do WAHA (`lib/waha/ingest.ts`) é o modelo a seguir — mapear
+ * `CanonicalEvent` para o mesmo formato interno que o `dispatchWahaEvent` consome
+ * é o próximo passo, e é trabalho suficiente para merecer seu próprio PRD.
+ *
+ * O que ESTA função faz hoje: valida que o payload é reconhecível pelo
+ * waconector, conta os eventos por tipo, e devolve 200. O webhook já está
+ * roteado (o token resolve a sessão e o provider), e o corpo cru já está
+ * arquivado pela rota — então nada se perde enquanto o ingest não chega.
+ *
+ * Verificação de assinatura: o EvoAPI pode assinar webhooks com um token
+ * configurado no servidor. Quando `secret` está disponível, verificamos; quando
+ * não está, aceitamos (mesmo critério do WAHA Core, que não assina por default).
+ */
+async function waconectorInbound(
+  _admin: SupabaseClient,
+  input: InboundWebhookInput,
+): Promise<InboundWebhookOutcome> {
+  try {
+    const waconector = await import("waconector");
+    const evolutionMod = await import("waconector/evolution");
+    const adapter = evolutionMod.evolution({
+      baseUrl: process.env.WACONECTOR_BASE_URL ?? "",
+      apiKey: process.env.WACONECTOR_API_KEY ?? "",
+    });
+    const connector = waconector.createConnector(adapter);
+
+    // O waconector nunca lança em parseWebhook — payload irreconhecível vira
+    // `[{ type: 'unknown', ... }]`, que é exatamente o que queremos logar.
+    const events = connector.webhooks.parse({
+      headers: Object.fromEntries(input.headers.entries()),
+      body: JSON.parse(input.rawBody),
+    });
+
+    // Conta por tipo para diagnóstico — o ingest completo virá depois.
+    const porTipo: Record<string, number> = {};
+    for (const ev of events) {
+      porTipo[ev.type] = (porTipo[ev.type] ?? 0) + 1;
+    }
+
+    return {
+      ok: true,
+      body: {
+        status: "parsed",
+        events: events.length,
+        por_tipo: porTipo,
+        // Sinaliza que o ingest completo é pendente — quem depura vê no log.
+        ingest: "pendente",
+      },
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "erro_desconhecido";
+    return { ok: false, code: "invalid_json", message: `waconector_parse_failed: ${msg}` };
+  }
 }
