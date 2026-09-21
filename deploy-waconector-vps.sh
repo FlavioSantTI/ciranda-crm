@@ -2,75 +2,45 @@
 #
 # deploy-waconector-vps.sh — Deploy do clinicCRM com adapter waconector na VPS.
 #
-# Pre-requisitos na VPS: docker, docker compose, git, node/pnpm (so p/ buildar waconector)
+# O waconector está VENDORizado em vendor/waconector/ (build self-contained,
+# zero-deps). Não precisa clonar nem buildar nada extra — o docker build do
+# clinicCRM pega o vendored direto via `file:vendor/waconector` no package.json.
+#
+# Pre-requisitos na VPS: docker, docker compose, git
 #
 # Uso:
-#   bash deploy-waconector-vps.sh
+#   bash deploy-waconector-vps.sh              # build + up
+#   bash deploy-waconector-vps.sh --skip-build # só up (já buildou antes)
 #
 set -euo pipefail
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 CLINIC_CRM_REPO="https://github.com/FlavioSantTI/clinicCRM.git"
 CLINIC_CRM_BRANCH="cursor/waconector-adapter"
-WACONECTOR_REPO="https://github.com/alltomatos/waconector.git"
 INSTALL_DIR="${INSTALL_DIR:-/opt/cliniccrm-waconector}"
 
 echo "============================================"
 echo "  Deploy clinicCRM + waconector na VPS"
+echo "  (waconector vendorizado — sem clone extra)"
 echo "============================================"
 echo ""
 
-# ─── 1. Clonar repos ────────────────────────────────────────────────────────
-echo "1. Clonando repos..."
+# ─── 1. Clonar clinicCRM ────────────────────────────────────────────────────
+echo "1. Clonando clinicCRM..."
 
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 
 if [ ! -d "clinicCRM" ]; then
-  git clone -b "$CLINIC_CRM_BRANCH" "$CLINIC_CRM_REPO" clinicCRM
+    git clone -b "$CLINIC_CRM_BRANCH" "$CLINIC_CRM_REPO" clinicCRM
 else
-  echo "   clinicCRM ja existe — pulando clone"
+  echo "   clinicCRM ja existe — atualizando"
   cd clinicCRM && git pull origin "$CLINIC_CRM_BRANCH" && cd ..
 fi
 
-if [ ! -d "waconector" ]; then
-  git clone "$WACONECTOR_REPO" waconector
-else
-  echo "   waconector ja existe — pulando clone"
-  cd waconector && git pull && cd ..
-fi
-
-# ─── 2. Aplicar patch v2 do waconector ─────────────────────────────────────
+# ─── 2. Configurar .env ─────────────────────────────────────────────────────
 echo ""
-echo "2. Aplicando patch v2 do waconector (EvoAPI v2 support)..."
-
-cd waconector
-if git log --oneline -1 | grep -q "EvoAPI v2"; then
-  echo "   Patch ja aplicado — pulando"
-else
-  git apply ../clinicCRM/waconector-v2.patch
-  echo "   Patch aplicado!"
-fi
-cd ..
-
-# ─── 3. Buildar waconector ──────────────────────────────────────────────────
-echo ""
-echo "3. Buildando waconector..."
-
-cd waconector
-if [ ! -f dist/index.js ] && [ ! -f dist/index.cjs ]; then
-  npm install -g pnpm 2>/dev/null || true
-  pnpm install --frozen-lockfile
-  pnpm build
-  echo "   waconector buildado!"
-else
-  echo "   dist ja existe — pulando build"
-fi
-cd ..
-
-# ─── 4. Configurar .env ─────────────────────────────────────────────────────
-echo ""
-echo "4. Configurando .env..."
+echo "2. Configurando .env..."
 
 cd clinicCRM
 
@@ -141,10 +111,10 @@ else
   echo "   .env ja existe — pulando"
 fi
 
-# ─── 5. Buildar e subir ─────────────────────────────────────────────────────
+# ─── 3. Buildar e subir ─────────────────────────────────────────────────────
 echo ""
-echo "5. Buildando imagens Docker (pode levar 15-25min)..."
-echo "   (Use --skip-build se ja buildou antes)"
+echo "3. Buildando imagens Docker (pode levar 15-25min)..."
+echo "   (waconector vendored entra no build automaticamente)"
 echo ""
 
 if [ "${1:-}" != "--skip-build" ]; then
@@ -152,7 +122,7 @@ if [ "${1:-}" != "--skip-build" ]; then
 fi
 
 echo ""
-echo "6. Subindo stack..."
+echo "4. Subindo stack..."
 docker compose -f docker-compose.prod.yml up -d
 
 echo ""
@@ -160,15 +130,14 @@ echo "============================================"
 echo "  Deploy concluido!"
 echo "============================================"
 echo ""
-echo "  CRM:      https://$DOMAIN"
-echo "  EvoAPI:    $WACONECTOR_BASE_URL"
-echo "  Instancia: $WACONECTOR_INSTANCE"
+echo "  CRM:       https://$DOMAIN"
+echo "  EvoAPI:     $EVOAPI_URL"
+echo "  Instancia:  $EVOAPI_INST"
 echo ""
 echo "  Proximo passo: configurar o webhook da EvoAPI"
-echo "  Veja o output do script de webhook abaixo."
 echo ""
 
-# ─── 7. Mostrar URL do webhook ─────────────────────────────────────────────
+# ─── 5. Mostrar URL do webhook ─────────────────────────────────────────────
 WEBHOOK_TOKEN=$(grep -oP 'waconectorbertuolti[a-f0-9]+' .env 2>/dev/null || echo "")
 if [ -z "$WEBHOOK_TOKEN" ]; then
   echo "  AVISO: Token do webhook nao encontrado no .env."

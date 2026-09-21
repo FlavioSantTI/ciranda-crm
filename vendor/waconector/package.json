@@ -1,0 +1,131 @@
+{
+  "name": "waconector",
+  "version": "1.3.0-vendored",
+  "description": "Conector universal para APIs nao-oficiais de WhatsApp — vendorizado no clinicCRM com patch EvoAPI v2.",
+  "license": "MIT",
+  "author": "Alltomatos",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./testing": {
+      "import": {
+        "types": "./dist/testing/index.d.ts",
+        "default": "./dist/testing/index.js"
+      },
+      "require": {
+        "types": "./dist/testing/index.d.cts",
+        "default": "./dist/testing/index.cjs"
+      }
+    },
+    "./waha": {
+      "import": {
+        "types": "./dist/adapters/waha/index.d.ts",
+        "default": "./dist/adapters/waha/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/waha/index.d.cts",
+        "default": "./dist/adapters/waha/index.cjs"
+      }
+    },
+    "./evolution": {
+      "import": {
+        "types": "./dist/adapters/evolution/index.d.ts",
+        "default": "./dist/adapters/evolution/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/evolution/index.d.cts",
+        "default": "./dist/adapters/evolution/index.cjs"
+      }
+    },
+    "./uazapi": {
+      "import": {
+        "types": "./dist/adapters/uazapi/index.d.ts",
+        "default": "./dist/adapters/uazapi/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/uazapi/index.d.cts",
+        "default": "./dist/adapters/uazapi/index.cjs"
+      }
+    },
+    "./zapi": {
+      "import": {
+        "types": "./dist/adapters/zapi/index.d.ts",
+        "default": "./dist/adapters/zapi/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/zapi/index.d.cts",
+        "default": "./dist/adapters/zapi/index.cjs"
+      }
+    },
+    "./wuzapi": {
+      "import": {
+        "types": "./dist/adapters/wuzapi/index.d.ts",
+        "default": "./dist/adapters/wuzapi/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/wuzapi/index.d.cts",
+        "default": "./dist/adapters/wuzapi/index.cjs"
+      }
+    },
+    "./whapi": {
+      "import": {
+        "types": "./dist/adapters/whapi/index.d.ts",
+        "default": "./dist/adapters/whapi/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/whapi/index.d.cts",
+        "default": "./dist/adapters/whapi/index.cjs"
+      }
+    },
+    "./quepasa": {
+      "import": {
+        "types": "./dist/adapters/quepasa/index.d.ts",
+        "default": "./dist/adapters/quepasa/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/quepasa/index.d.cts",
+        "default": "./dist/adapters/quepasa/index.cjs"
+      }
+    },
+    "./wppconnect": {
+      "import": {
+        "types": "./dist/adapters/wppconnect/index.d.ts",
+        "default": "./dist/adapters/wppconnect/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/wppconnect/index.d.cts",
+        "default": "./dist/adapters/wppconnect/index.cjs"
+      }
+    },
+    "./izapia": {
+      "import": {
+        "types": "./dist/adapters/izapia/index.d.ts",
+        "default": "./dist/adapters/izapia/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/izapia/index.d.cts",
+        "default": "./dist/adapters/izapia/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  }
+}

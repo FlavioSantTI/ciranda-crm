@@ -106,6 +106,10 @@ describe("adapter waconector", () => {
     vi.stubEnv("WACONECTOR_BASE_URL", WAC_BASE);
     vi.stubEnv("WACONECTOR_API_KEY", "evo-token");
     vi.stubEnv("WACONECTOR_BACKEND", "evolution");
+    // Stub explícito: o setup do vitest carrega .env.local (que tem
+    // WACONECTOR_INSTANCE da sessão de teste EvoAPI). Sem isto, o adapter
+    // usa paths v2 (/message/sendText/{instance}) e o mock v1 não casa.
+    vi.stubEnv("WACONECTOR_INSTANCE", "");
 
     // O waconector evolution adapter faz POST /send/text e devolve
     // { data: { Info: { ID: "..." } } } no formato do EvoAPI.
@@ -137,6 +141,8 @@ describe("adapter waconector", () => {
     vi.stubEnv("WACONECTOR_BASE_URL", WAC_BASE);
     vi.stubEnv("WACONECTOR_API_KEY", "evo-token");
     vi.stubEnv("WACONECTOR_BACKEND", "evolution");
+    // Stub explícito: isola do .env.local (que tem WACONECTOR_INSTANCE).
+    vi.stubEnv("WACONECTOR_INSTANCE", "");
 
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       const href = String(url);
