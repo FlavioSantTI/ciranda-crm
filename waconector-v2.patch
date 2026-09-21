@@ -1,0 +1,240 @@
+﻿From 1cee3c0a23677dad857d623d3f9c25d49f48d9f3 Mon Sep 17 00:00:00 2001
+From: aribe <aribe@opensquad.local>
+Date: Mon, 21 Sep 2026 14:29:48 -0300
+Subject: [PATCH] feat(evolution): suporte a EvoAPI v2 com instance no path e
+ parsing de resposta v2
+
+Quando options.instance e fornecido, o adapter usa endpoints v2: /message/sendText/instance em vez de /send/text. Parsing de status e message ID compativel com ambos os formatos v1 e v2. Backward compatible sem instance.
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+---
+ src/adapters/evolution/index.ts | 96 ++++++++++++++++++++++++---------
+ 1 file changed, 71 insertions(+), 25 deletions(-)
+
+diff --git a/src/adapters/evolution/index.ts b/src/adapters/evolution/index.ts
+index 494b94d..d670e58 100644
+--- a/src/adapters/evolution/index.ts
++++ b/src/adapters/evolution/index.ts
+@@ -170,22 +170,33 @@ export function evolution(options: EvolutionOptions): WaAdapter {
+     fetch: options.fetch,
+   });
+ 
++  // EvoAPI v2 exige o nome da inst├óncia no path; v1 resolve pelo apikey.
++  // Quando `options.instance` ├® fornecido, usamos os endpoints v2.
++  // v1: /send/text  ÔåÆ  v2: /message/sendText/{instance}
++  // v1: /send/media ÔåÆ  v2: /message/sendMedia/{instance}
++  const inst = options.instance;
++  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
++  const msgPath = (action: string) =>
++    inst ? `/message/send${cap(action)}/${inst}` : `/send/${action}`;
++  const instancePath = (action: string) =>
++    inst ? `/instance/${action}/${inst}` : `/instance/${action}`;
++
+   const instance: InstanceApi = {
+     connect: () => connectInstance(http, options),
+-    status: () => statusInstance(http),
+-    logout: () => logoutInstance(http),
++    status: () => statusInstance(http, inst),
++    logout: () => logoutInstance(http, inst),
+   };
+ 
+   const messages: MessagesApi = {
+-    sendText: (input) => sendText(http, input),
+-    sendMedia: (input) => sendMedia(http, input),
++    sendText: (input) => sendText(http, input, msgPath('text')),
++    sendMedia: (input) => sendMedia(http, input, msgPath('media')),
+     sendReaction: (input) => sendReaction(http, input),
+     edit: (input) => editMessage(http, input),
+     delete: (input) => deleteMessage(http, input),
+     markRead: (input) => markMessageRead(http, input),
+-    sendLocation: (input) => sendLocation(http, input),
+-    sendContactCard: (input) => sendContactCard(http, input),
+-    sendPoll: (input) => sendPoll(http, input),
++    sendLocation: (input) => sendLocation(http, input, msgPath('location')),
++    sendContactCard: (input) => sendContactCard(http, input, msgPath('contact')),
++    sendPoll: (input) => sendPoll(http, input, msgPath('poll')),
+     download: (input) => downloadMedia(http, input),
+   };
+ 
+@@ -236,7 +247,7 @@ export function evolution(options: EvolutionOptions): WaAdapter {
+   };
+ 
+   const presence: PresenceApi = {
+-    setTyping: (input) => setChatPresence(http, input),
++    setTyping: (input) => setChatPresence(http, input, inst),
+   };
+ 
+   /**
+@@ -361,9 +372,10 @@ async function connectInstance(
+   if (options.webhookUrl) body.webhookUrl = options.webhookUrl;
+   if (options.subscribe) body.subscribe = options.subscribe;
+ 
++  const path = options.instance ? `/instance/connect/${options.instance}` : '/instance/connect';
+   const connectResponse = await http.request<EvolutionEnvelope>({
+     method: 'POST',
+-    path: '/instance/connect',
++    path,
+     body,
+   });
+ 
+@@ -386,21 +398,39 @@ async function connectInstance(
+   };
+ }
+ 
+-async function statusInstance(http: HttpClient): Promise<InstanceStatus> {
++async function statusInstance(http: HttpClient, instance?: string): Promise<InstanceStatus> {
++  // v2 usa /instance/connect/{instance} (GET) para ler o estado de conex├úo;
++  // v1 usa /instance/status.
++  const path = instance ? `/instance/connect/${instance}` : '/instance/status';
+   const response = await http.request<EvolutionEnvelope>({
+     method: 'GET',
+-    path: '/instance/status',
++    path,
+   });
+-  const data = asRecord(response.data);
++  // v1: {data: {Connected, LoggedIn}}  ÔåÆ  mapInstanceState(response.data)
++  // v2: {instance: {state: "open"}}     ÔåÆ  mapInstanceState(response) (sem wrapper data)
++  const data = asRecord(response.data) ?? asRecord(response as unknown as Record<string, unknown>);
+   return { state: mapInstanceState(data), raw: response };
+ }
+ 
+-async function logoutInstance(http: HttpClient): Promise<void> {
+-  await http.request({ method: 'DELETE', path: '/instance/logout' });
++async function logoutInstance(http: HttpClient, instance?: string): Promise<void> {
++  const path = instance ? `/instance/logout/${instance}` : '/instance/logout';
++  await http.request({ method: 'DELETE', path });
+ }
+ 
+ function mapInstanceState(data: Record<string, unknown> | undefined): InstanceState {
+   if (!data) return 'unknown';
++
++  // v2: {instance: {state: "open"|"close"|"connecting"}}
++  const instanceObj = asRecord(data.instance);
++  if (instanceObj) {
++    const state = asString(instanceObj.state);
++    if (state === 'open') return 'connected';
++    if (state === 'close' || state === 'closed') return 'disconnected';
++    if (state === 'connecting') return 'connecting';
++    if (state === 'qr') return 'qr';
++  }
++
++  // v1: {Connected, LoggedIn}
+   const connected = asBoolean(data.Connected);
+   const loggedIn = asBoolean(data.LoggedIn);
+   if (connected === undefined || loggedIn === undefined) return 'unknown';
+@@ -416,7 +446,7 @@ function mapInstanceState(data: Record<string, unknown> | undefined): InstanceSt
+ // messages.*
+ // ---------------------------------------------------------------------------
+ 
+-async function sendText(http: HttpClient, input: SendTextInput): Promise<SentMessage> {
++async function sendText(http: HttpClient, input: SendTextInput, path: string): Promise<SentMessage> {
+   const body: Record<string, unknown> = {
+     number: toProviderNumber(input.to),
+     text: input.text,
+@@ -430,13 +460,13 @@ async function sendText(http: HttpClient, input: SendTextInput): Promise<SentMes
+ 
+   const response = await http.request<EvolutionEnvelope>({
+     method: 'POST',
+-    path: '/send/text',
++    path,
+     body,
+   });
+   return toSentMessage(input.to, response);
+ }
+ 
+-async function sendMedia(http: HttpClient, input: SendMediaInput): Promise<SentMessage> {
++async function sendMedia(http: HttpClient, input: SendMediaInput, path: string): Promise<SentMessage> {
+   // Checagem de ├║ltimo recurso (o conector j├í valida isso) para quem instancia o adapter sem
+   // createConnector ÔÇö ver CONTRIBUTING.md, se├º├úo "Conven├º├Áes inegoci├íveis".
+   // pkg/sendMessage/handler/send_handler.go (variante JSON de POST /send/media): quando
+@@ -466,7 +496,7 @@ async function sendMedia(http: HttpClient, input: SendMediaInput): Promise<SentM
+ 
+   const response = await http.request<EvolutionEnvelope>({
+     method: 'POST',
+-    path: '/send/media',
++    path,
+     body,
+   });
+   return toSentMessage(input.to, response);
+@@ -573,7 +603,7 @@ async function markMessageRead(http: HttpClient, input: MarkMessageReadInput): P
+  * schema (`name`, `address`, ambos opcionais). Resposta real do provider confirma `Type:
+  * LocationMessage`, `Message.locationMessage: {degreesLatitude, degreesLongitude, name, address}`.
+  */
+-async function sendLocation(http: HttpClient, input: SendLocationInput): Promise<SentMessage> {
++async function sendLocation(http: HttpClient, input: SendLocationInput, path: string): Promise<SentMessage> {
+   const body: Record<string, unknown> = {
+     number: toProviderNumber(input.to),
+     latitude: input.latitude,
+@@ -584,7 +614,7 @@ async function sendLocation(http: HttpClient, input: SendLocationInput): Promise
+ 
+   const response = await http.request<EvolutionEnvelope>({
+     method: 'POST',
+-    path: '/send/location',
++    path,
+     body,
+   });
+   return toSentMessage(input.to, response);
+@@ -601,10 +631,11 @@ async function sendLocation(http: HttpClient, input: SendLocationInput): Promise
+ async function sendContactCard(
+   http: HttpClient,
+   input: SendContactCardInput,
++  path: string,
+ ): Promise<SentMessage> {
+   const response = await http.request<EvolutionEnvelope>({
+     method: 'POST',
+-    path: '/send/contact',
++    path,
+     body: {
+       number: toProviderNumber(input.to),
+       vcard: { fullName: input.contactName, phone: input.contactPhone },
+@@ -620,10 +651,10 @@ async function sendContactCard(
+  * `maxAnswer: options.length` (qualquer n├║mero de op├º├Áes) quando `true`, `0` quando `false`/
+  * ausente. Resposta confirma `Type: PollCreationMessage`.
+  */
+-async function sendPoll(http: HttpClient, input: SendPollInput): Promise<SentMessage> {
++async function sendPoll(http: HttpClient, input: SendPollInput, path: string): Promise<SentMessage> {
+   const response = await http.request<EvolutionEnvelope>({
+     method: 'POST',
+-    path: '/send/poll',
++    path,
+     body: {
+       number: toProviderNumber(input.to),
+       question: input.question,
+@@ -635,6 +666,20 @@ async function sendPoll(http: HttpClient, input: SendPollInput): Promise<SentMes
+ }
+ 
+ function toSentMessage(to: string, response: EvolutionEnvelope): SentMessage {
++  // v2: resposta flat com {key: {id: "..."}, messageTimestamp: ...}
++  // v1: {data: {Info: {ID: "...", Timestamp: ...}}}
++  const key = asRecord((response as unknown as Record<string, unknown>).key);
++  if (key) {
++    // v2
++    return {
++      id: asString(key.id) ?? asString(key.ID) ?? '',
++      chatId: to,
++      timestamp: toEpochMs((response as unknown as Record<string, unknown>).messageTimestamp) ?? Date.now(),
++      raw: response,
++    };
++  }
++
++  // v1
+   const data = asRecord(response.data);
+   const info = asRecord(data?.Info);
+   return {
+@@ -1279,10 +1324,11 @@ async function unpinChat(http: HttpClient, chatId: string): Promise<void> {
+  * **Sem `presence.set`/`presence.subscribe`**: nenhum endpoint equivalente encontrado em
+  * `evo-go-message.yaml`/`evo-go-chat.yaml`.
+  */
+-async function setChatPresence(http: HttpClient, input: SetTypingInput): Promise<void> {
++async function setChatPresence(http: HttpClient, input: SetTypingInput, instance?: string): Promise<void> {
++  const path = instance ? `/message/presence/${instance}` : '/message/presence';
+   await http.request({
+     method: 'POST',
+-    path: '/message/presence',
++    path,
+     body: {
+       number: toProviderNumber(input.to),
+       state: input.state,
+-- 
+2.54.0.windows.1
+
