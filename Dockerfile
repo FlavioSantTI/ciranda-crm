@@ -7,6 +7,8 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 COPY package.json pnpm-lock.yaml ./
+# waconector é dependência file: — o install precisa da pasta antes do lockfile.
+COPY vendor/waconector ./vendor/waconector
 RUN pnpm install --frozen-lockfile
 
 # ---- build: gera .next/standalone ----
