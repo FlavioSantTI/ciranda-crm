@@ -6,7 +6,7 @@
 # fora deste stack.
 #
 # Publicar (no manager, com as vars exportadas):
-#   docker stack deploy -c docker-compose.swarm.yml ciranda
+#   docker stack deploy -c docker-compose.swarm.yml ciranda-crm
 #
 # O Swarm puxa a imagem. Ela precisa existir em
 # ghcr.io/flaviosantti/ciranda-crm (e as irmãs worker e scheduler).
@@ -28,12 +28,16 @@ services:
       APP_NAME: ${APP_NAME:-Ciranda CRM}
       UPSTASH_REDIS_REST_URL: http://srh:80
       UPSTASH_REDIS_REST_TOKEN: ${SRH_TOKEN}
+      CPF_ENCRYPTION_KEY: ${CPF_ENCRYPTION_KEY}
+      WAHA_BYO_ENCRYPTION_KEY: ${WAHA_BYO_ENCRYPTION_KEY}
+      AI_CRED_AES_KEY: ${AI_CRED_AES_KEY}
       WACONECTOR_BASE_URL: ${WACONECTOR_BASE_URL}
       WACONECTOR_API_KEY: ${WACONECTOR_API_KEY}
       WACONECTOR_BACKEND: ${WACONECTOR_BACKEND:-evolution}
       WACONECTOR_INSTANCE: ${WACONECTOR_INSTANCE}
-      WAHA_API_BASE_URL: ${WAHA_API_BASE_URL:-}
-      WAHA_API_KEY: ${WAHA_API_KEY:-}
+      WAHA_API_BASE_URL: ${WAHA_API_BASE_URL:-http://127.0.0.1:9}
+      WAHA_API_KEY: ${WAHA_API_KEY:-unused}
+      WAHA_WEBHOOK_BASE_URL: ${WAHA_WEBHOOK_BASE_URL:-https://ciranda-crm.flaviosantiago.com.br}
     deploy:
       replicas: 1
       restart_policy:
@@ -65,10 +69,16 @@ services:
       INTERNAL_SECRET: ${INTERNAL_SECRET}
       UPSTASH_REDIS_REST_URL: http://srh:80
       UPSTASH_REDIS_REST_TOKEN: ${SRH_TOKEN}
+      CPF_ENCRYPTION_KEY: ${CPF_ENCRYPTION_KEY}
+      WAHA_BYO_ENCRYPTION_KEY: ${WAHA_BYO_ENCRYPTION_KEY}
+      AI_CRED_AES_KEY: ${AI_CRED_AES_KEY}
       WACONECTOR_BASE_URL: ${WACONECTOR_BASE_URL}
       WACONECTOR_API_KEY: ${WACONECTOR_API_KEY}
       WACONECTOR_BACKEND: ${WACONECTOR_BACKEND:-evolution}
       WACONECTOR_INSTANCE: ${WACONECTOR_INSTANCE}
+      WAHA_API_BASE_URL: ${WAHA_API_BASE_URL:-http://127.0.0.1:9}
+      WAHA_API_KEY: ${WAHA_API_KEY:-unused}
+      WAHA_WEBHOOK_BASE_URL: ${WAHA_WEBHOOK_BASE_URL:-https://ciranda-crm.flaviosantiago.com.br}
     deploy:
       replicas: 1
       restart_policy:
