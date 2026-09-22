@@ -9,13 +9,13 @@
 #   docker stack deploy -c docker-compose.swarm.yml ciranda-crm
 #
 # O Swarm puxa a imagem. Ela precisa existir em
-# ghcr.io/flaviosantti/ciranda-crm (e as irmãs worker e scheduler).
+# docker.io/flaviosantti/ciranda-crm (e as irmãs worker e scheduler).
 
 version: "3.8"
 
 services:
   app:
-    image: ghcr.io/flaviosantti/ciranda-crm:latest
+    image: docker.io/flaviosantti/ciranda-crm:latest
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
@@ -59,7 +59,7 @@ services:
       - internal
 
   worker:
-    image: ghcr.io/flaviosantti/ciranda-worker:latest
+    image: docker.io/flaviosantti/ciranda-worker:latest
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
@@ -113,7 +113,7 @@ services:
       - internal
 
   scheduler:
-    image: ghcr.io/flaviosantti/ciranda-scheduler:latest
+    image: docker.io/flaviosantti/ciranda-scheduler:latest
     environment:
       TZ: UTC
       INTERNAL_SECRET: ${INTERNAL_SECRET}
