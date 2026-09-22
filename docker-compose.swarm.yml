@@ -1,0 +1,121 @@
+# Ciranda CRM — stack Swarm para a VPS que já tem Traefik na rede Favucanet.
+#
+# Mesmo desenho do bom-pastor-frontend: labels dentro de deploy, entrypoint
+# websecure, certresolver letsencryptresolver, porta interna explícita.
+# O Caddy não entra. O WAHA não entra — o WhatsApp deste teste é a EvoAPI,
+# fora deste stack.
+#
+# Publicar (no manager, com as vars exportadas):
+#   docker stack deploy -c docker-compose.swarm.yml ciranda
+#
+# O Swarm puxa a imagem. Ela precisa existir em
+# ghcr.io/flaviosantti/ciranda-crm (e as irmãs worker e scheduler).
+
+version: "3.8"
+
+services:
+  app:
+    image: ghcr.io/flaviosantti/ciranda-crm:latest
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      NEXT_PUBLIC_ADMIN_URL: ${NEXT_PUBLIC_ADMIN_URL}
+      INTERNAL_SECRET: ${INTERNAL_SECRET}
+      APP_NAME: ${APP_NAME:-Ciranda CRM}
+      UPSTASH_REDIS_REST_URL: http://srh:80
+      UPSTASH_REDIS_REST_TOKEN: ${SRH_TOKEN}
+      WACONECTOR_BASE_URL: ${WACONECTOR_BASE_URL}
+      WACONECTOR_API_KEY: ${WACONECTOR_API_KEY}
+      WACONECTOR_BACKEND: ${WACONECTOR_BACKEND:-evolution}
+      WACONECTOR_INSTANCE: ${WACONECTOR_INSTANCE}
+      WAHA_API_BASE_URL: ${WAHA_API_BASE_URL:-}
+      WAHA_API_KEY: ${WAHA_API_KEY:-}
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 768M
+      labels:
+        traefik.enable: "true"
+        traefik.docker.network: "Favucanet"
+        traefik.http.routers.ciranda.rule: "Host(`crm.flaviosantiago.com.br`)"
+        traefik.http.routers.ciranda.entrypoints: "websecure"
+        traefik.http.routers.ciranda.tls: "true"
+        traefik.http.routers.ciranda.tls.certresolver: "letsencryptresolver"
+        traefik.http.routers.ciranda.service: "ciranda-svc"
+        traefik.http.services.ciranda-svc.loadbalancer.server.port: "3000"
+    networks:
+      - Favucanet
+      - internal
+
+  worker:
+    image: ghcr.io/flaviosantti/ciranda-worker:latest
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL}
+      INTERNAL_SECRET: ${INTERNAL_SECRET}
+      UPSTASH_REDIS_REST_URL: http://srh:80
+      UPSTASH_REDIS_REST_TOKEN: ${SRH_TOKEN}
+      WACONECTOR_BASE_URL: ${WACONECTOR_BASE_URL}
+      WACONECTOR_API_KEY: ${WACONECTOR_API_KEY}
+      WACONECTOR_BACKEND: ${WACONECTOR_BACKEND:-evolution}
+      WACONECTOR_INSTANCE: ${WACONECTOR_INSTANCE}
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    networks:
+      - internal
+
+  srh:
+    image: hiett/serverless-redis-http@sha256:5b0bb9239fce53abf87b2018a7a0deb9ec7bd900c5360738fe5fbeeb426f9150
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: ${SRH_TOKEN}
+      SRH_CONNECTION_STRING: "redis://redis:6379"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    networks:
+      - internal
+
+  scheduler:
+    image: ghcr.io/flaviosantti/ciranda-scheduler:latest
+    environment:
+      TZ: UTC
+      INTERNAL_SECRET: ${INTERNAL_SECRET}
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    networks:
+      - internal
+
+networks:
+  Favucanet:
+    external: true
+  internal:
+    driver: overlay

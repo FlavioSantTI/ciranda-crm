@@ -64,6 +64,7 @@ if [ ! -f .env ]; then
   read -rp "   Supabase URL [$DEFAULT_SUPABASE_URL]: " SUPABASE_URL; SUPABASE_URL="${SUPABASE_URL:-$DEFAULT_SUPABASE_URL}"
   read -rp "   Supabase Anon Key: " SUPABASE_ANON_KEY
   read -rp "   Supabase Service Role Key: " SUPABASE_SERVICE_KEY
+  read -rp "   Supabase DB URL (postgres): " SUPABASE_DB_URL
   read -rp "   EvoAPI URL [$DEFAULT_EVOAPI_URL]: " EVOAPI_URL; EVOAPI_URL="${EVOAPI_URL:-$DEFAULT_EVOAPI_URL}"
   read -rp "   EvoAPI API Key [$DEFAULT_EVOAPI_KEY]: " EVOAPI_KEY; EVOAPI_KEY="${EVOAPI_KEY:-$DEFAULT_EVOAPI_KEY}"
   read -rp "   EvoAPI Instancia [$DEFAULT_EVOAPI_INSTANCE]: " EVOAPI_INST; EVOAPI_INST="${EVOAPI_INST:-$DEFAULT_EVOAPI_INSTANCE}"
@@ -84,6 +85,13 @@ TRAEFIK_NETWORK=${TRAEFIK_NETWORK:-Favucanet}
 NEXT_PUBLIC_SUPABASE_URL=$SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_KEY
+SUPABASE_DB_URL=$SUPABASE_DB_URL
+NEXT_PUBLIC_APP_URL=https://$DOMAIN
+NEXT_PUBLIC_ADMIN_URL=https://$DOMAIN
+APP_NAME=Ciranda CRM
+NODE_ENV=production
+UPSTASH_REDIS_REST_URL=http://srh:80
+UPSTASH_REDIS_REST_TOKEN=$SRH_TOKEN
 
 # ─── Secrets internos ────────────────────────
 INTERNAL_SECRET=$INTERNAL_SECRET
@@ -121,12 +129,18 @@ echo "   (waconector vendored entra no build automaticamente)"
 echo ""
 
 if [ "${1:-}" != "--skip-build" ]; then
-  docker compose -f docker-compose.prod.yml -f docker-compose.build.yml build
+  docker build -t ghcr.io/flaviosantti/ciranda-crm:latest .
+  docker build -f Dockerfile.worker -t ghcr.io/flaviosantti/ciranda-worker:latest .
+  docker build -f Dockerfile.scheduler -t ghcr.io/flaviosantti/ciranda-scheduler:latest .
 fi
 
 echo ""
-echo "4. Subindo stack (Traefik da VPS faz o HTTPS; o Caddy fica de fora)..."
-docker compose -f docker-compose.prod.yml -f docker-compose.traefik.yml -f docker-compose.build.yml up -d
+echo "4. Publicando stack no Swarm (Traefik da Favucanet faz o HTTPS)..."
+set -a
+# shellcheck disable=SC1091
+. ./.env
+set +a
+docker stack deploy -c docker-compose.swarm.yml ciranda
 
 echo ""
 echo "============================================"
@@ -155,6 +169,6 @@ else
 fi
 
 echo ""
-echo "  Logs: docker compose -f docker-compose.prod.yml logs -f app"
-echo "  Stop: docker compose -f docker-compose.prod.yml down"
+echo "  Logs: docker service logs -f ciranda_app"
+echo "  Stop: docker stack rm ciranda"
 echo ""
