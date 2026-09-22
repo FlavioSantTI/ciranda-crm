@@ -44,7 +44,7 @@ services:
       labels:
         traefik.enable: "true"
         traefik.docker.network: "Favucanet"
-        traefik.http.routers.ciranda.rule: "Host(`crm.flaviosantiago.com.br`)"
+        traefik.http.routers.ciranda.rule: "Host(`ciranda-crm.flaviosantiago.com.br`)"
         traefik.http.routers.ciranda.entrypoints: "websecure"
         traefik.http.routers.ciranda.tls: "true"
         traefik.http.routers.ciranda.tls.certresolver: "letsencryptresolver"

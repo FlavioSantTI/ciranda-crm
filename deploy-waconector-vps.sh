@@ -52,7 +52,7 @@ if [ ! -f .env ]; then
   echo ""
 
   # Defaults baseados na VPS do Flavio
-  DEFAULT_DOMAIN="${DOMAIN:-crm.flaviosantiago.com.br}"
+  DEFAULT_DOMAIN="${DOMAIN:-ciranda-crm.flaviosantiago.com.br}"
   DEFAULT_EMAIL="${ACME_EMAIL:-flavio@flaviosantiago.com.br}"
   DEFAULT_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-https://supabase.flaviosantiago.com.br}"
   DEFAULT_EVOAPI_URL="${WACONECTOR_BASE_URL:-https://evoapi.flaviosantiago.com.br}"
