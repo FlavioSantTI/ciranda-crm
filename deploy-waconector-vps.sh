@@ -15,7 +15,9 @@
 set -euo pipefail
 
 # ─── Config ──────────────────────────────────────────────────────────────────
-CLINIC_CRM_REPO="https://github.com/FlavioSantTI/clinicCRM.git"
+# Repositório privado. O clone na VPS precisa de acesso (gh auth login
+# ou uma deploy key). O fork público clinicCRM não tem a marca Ciranda.
+CLINIC_CRM_REPO="https://github.com/FlavioSantTI/ciranda-crm.git"
 CLINIC_CRM_BRANCH="cursor/waconector-adapter"
 INSTALL_DIR="${INSTALL_DIR:-/opt/cliniccrm-waconector}"
 
@@ -75,7 +77,8 @@ if [ ! -f .env ]; then
 # ─── Dominio / HTTPS ──────────────────────────
 DOMAIN=$DOMAIN
 ACME_EMAIL=$ACME_EMAIL
-REVERSE_PROXY=caddy
+REVERSE_PROXY=traefik
+TRAEFIK_NETWORK=${TRAEFIK_NETWORK:-Favucanet}
 
 # ─── Supabase ────────────────────────────────
 NEXT_PUBLIC_SUPABASE_URL=$SUPABASE_URL
@@ -122,13 +125,16 @@ if [ "${1:-}" != "--skip-build" ]; then
 fi
 
 echo ""
-echo "4. Subindo stack..."
-docker compose -f docker-compose.prod.yml up -d
+echo "4. Subindo stack (Traefik da VPS faz o HTTPS; o Caddy fica de fora)..."
+docker compose -f docker-compose.prod.yml -f docker-compose.traefik.yml -f docker-compose.build.yml up -d
 
 echo ""
 echo "============================================"
 echo "  Deploy concluido!"
 echo "============================================"
+DOMAIN="${DOMAIN:-$(grep -E '^DOMAIN=' .env | cut -d= -f2-)}"
+EVOAPI_URL="${EVOAPI_URL:-$(grep -E '^WACONECTOR_BASE_URL=' .env | cut -d= -f2-)}"
+EVOAPI_INST="${EVOAPI_INST:-$(grep -E '^WACONECTOR_INSTANCE=' .env | cut -d= -f2-)}"
 echo ""
 echo "  CRM:       https://$DOMAIN"
 echo "  EvoAPI:     $EVOAPI_URL"
